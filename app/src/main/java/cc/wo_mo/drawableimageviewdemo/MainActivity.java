@@ -208,7 +208,6 @@ public class MainActivity extends AppCompatActivity {
         mDrawButton.setTypeface(null, Typeface.BOLD);
         mPenWidth.setTextColor(mDrawableImageView.getPenColor());
 
-
         // when add a new draw operation, refresh undo and redo button status
         mDrawableImageView.setOnStopDrawingListener(new DrawableImageView.OnStopDrawingListener() {
             @Override

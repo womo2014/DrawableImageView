@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
@@ -546,6 +547,13 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
         clearAll();
         super.setImageURI(uri);
     }
+
+    @Override
+    public void setImageBitmap(Bitmap bm) {
+        clearAll();
+        super.setImageBitmap(bm);
+    }
+
 
     @Override
     public void setImageDrawable(Drawable drawable) {
