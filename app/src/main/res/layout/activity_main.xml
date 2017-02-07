@@ -102,10 +102,14 @@
                 android:id="@+id/change_color_button"
                 android:text="切换颜色"/>
         </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="300dp"
             android:background="@color/colorPrimary"
             android:text="占位"/>
+
+
+
     </LinearLayout>
 </ScrollView>

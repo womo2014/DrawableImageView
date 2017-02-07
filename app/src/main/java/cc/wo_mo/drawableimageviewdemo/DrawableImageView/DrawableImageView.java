@@ -27,6 +27,8 @@ import java.util.List;
 public class DrawableImageView extends ImageView implements View.OnTouchListener {
 
     private boolean mHaveMove;
+    private boolean mNeedRedraw;
+    private Bitmap mCacheBitmap;
 
     private OnStartDrawingListener mOnStartDrawingListener;
     private OnStopDrawingListener mOnStopDrawingListener;
@@ -39,7 +41,7 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
     private int mPenColor, mPenAlpha, mPenWidth;
     private boolean mAntiAlias;
     private boolean mAllowPoint;
-
+    private int mMoveCount;
 
     /**
      * Instantiates a new Drawable image view.
@@ -91,8 +93,10 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
         mCurrentDrawOperationIndex = -1;
         mPenColor = Color.GREEN;
         mPenWidth = 15;
+        setClickable(true);
         mAntiAlias = true;
         mAllowPoint = true;
+        mNeedRedraw = true;
         setDrawingCacheEnabled(true);
         setOnTouchListener(this);
 //        a.recycle();
@@ -103,13 +107,24 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
         super.onDraw(canvas);
         if (mCurrentDrawOperationIndex <= -1)
             return;
-        Bitmap cacheBitmap;
-        cacheBitmap = Bitmap.createBitmap(getMeasuredWidth(), getMeasuredHeight(), Bitmap.Config.ARGB_8888);
-        for (int i = 0; i <= mCurrentDrawOperationIndex; i++) {
-            DrawOperation drawOperation = mDrawOperationList.get(i);
-            draw(cacheBitmap, drawOperation);
+        if (mNeedRedraw) {
+            if (mCacheBitmap != null) {
+                mCacheBitmap.recycle();
+            }
+            mCacheBitmap = Bitmap.createBitmap(getMeasuredWidth(), getMeasuredHeight(), Bitmap.Config.ARGB_8888);
+            for (int i = 0; i < mCurrentDrawOperationIndex; i++) {
+                DrawOperation drawOperation = mDrawOperationList.get(i);
+                draw(mCacheBitmap, drawOperation);
+            }
+            mNeedRedraw = false;
         }
-        canvas.drawBitmap(cacheBitmap,0, 0, null);
+        Bitmap bitmap = mCacheBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        draw(bitmap, mDrawOperationList.get(mCurrentDrawOperationIndex));
+        if (mDrawOperationList.get(mCurrentDrawOperationIndex).isCompleted()) {
+            mCacheBitmap.recycle();
+            mCacheBitmap = bitmap;
+        }
+        canvas.drawBitmap(bitmap,0, 0, null);
     }
 
 
@@ -121,6 +136,17 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
      */
     private void draw(Bitmap bitmap, DrawOperation drawOperation) {
         Canvas canvas = new Canvas(bitmap);
+        draw(canvas, drawOperation);
+    }
+
+
+    /**
+     * Do a drawing operation on a canvas
+     *
+     * @param canvas
+     * @param drawOperation
+     */
+    private void draw(Canvas canvas, DrawOperation drawOperation) {
         switch (drawOperation.getDrawingMode()) {
             case DRAW:
                 switch (drawOperation.getPenType()) {
@@ -140,6 +166,12 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
                 break;
             case ERASE:
                 canvas.drawPath(drawOperation.getPath(), drawOperation.getPaint());
+                if (!drawOperation.isCompleted()) {
+                    Paint paint = new Paint(drawOperation.getPaint());
+                    paint.setXfermode(null);
+                    paint.setColor(Color.RED);
+                    canvas.drawPoint(drawOperation.getStopX(), drawOperation.getStopY(), paint);
+                }
                 break;
         }
     }
@@ -200,11 +232,13 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
                     if (mOnStartDrawingListener != null) {
                         mOnStartDrawingListener.onStartDrawing();
                     }
+                    mMoveCount = 0;
                     mHaveMove = false;
                     result = false;
                     break;
                 case MotionEvent.ACTION_MOVE:
-//                    Log.d("onTouch", "ACTION_MOVE");
+                    Log.d("onTouch", "ACTION_MOVE");
+                    mMoveCount++;
                     curOperation = mDrawOperationList.get(mDrawOperationList.size()-1);
                     // touch point should move more than a threshold distance
                     if (Math.abs(event.getX()-curOperation.getStopX())+
@@ -219,6 +253,10 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
                         }
                         // in normal mode, path should line to the new point
                         if (mPenType == DrawOperation.PenType.NORMAL) {
+                            for (int i = 0; i < event.getHistorySize(); i++) {
+                                curOperation.getPath().lineTo(event.getHistoricalX(0, i),
+                                        event.getHistoricalY(0, i));
+                            }
                             curOperation.getPath().lineTo(event.getX(), event.getY());
                         }
                         curOperation.setStopX(event.getX()).setStopY(event.getY());
@@ -305,6 +343,7 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
     public void undo() {
         if (canUndo()) {
             mCurrentDrawOperationIndex--;
+            mNeedRedraw = true;
             invalidate();
         }
     }
@@ -344,6 +383,7 @@ public class DrawableImageView extends ImageView implements View.OnTouchListener
         Log.d("clearAll", "called");
         if (mDrawOperationList != null) {
             mDrawOperationList.clear();
+            mNeedRedraw = true;
         }
         mCurrentDrawOperationIndex = -1;
     }
